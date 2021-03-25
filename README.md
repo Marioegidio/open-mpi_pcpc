@@ -13,6 +13,7 @@
 
 ### Steps:
 
+- cd src
 - mpicc -c library.c -o library.o
 - mpicc test.c  library.o -o test.o
 - mpirun -np 4 test.o 
