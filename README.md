@@ -7,15 +7,11 @@
 
 # Execution
 
-<br>
-
 ##### You need open-mpi to execute
 
 <br>
-<br>
 
-
-## Steps:
+### Steps:
 
 - mpicc -c library.c -o library.o
 - mpicc test.c  library.o -o test.o
