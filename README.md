@@ -8,11 +8,9 @@
 
 ### Execution 
 
-<br>
 
 ###### [!important] You need open-mpi to execute
 
-<br>
 
 #### Steps:
 
