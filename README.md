@@ -1,19 +1,44 @@
 # Open-mpi_pcpc
 
-## Implementing broadcasting, gathering and scatter operations with open-mpi for the pcpc course. 
+## Exercise 1 
 
-<br>
-<br>
-
-# Execution
-
-##### You need open-mpi to execute
+### Implementing broadcasting, gathering and scatter operations with open-mpi for the pcpc course. 
 
 <br>
 
-### Steps:
+### Execution 
 
-- cd src
+<br>
+
+###### [!important] You need open-mpi to execute
+
+<br>
+
+#### Steps:
+
+- cd src/ese_1_[broadcast-gathering-scatter]
+- mpicc -c library.c -o library.o
+- mpicc test.c  library.o -o test.o
+- mpirun -np 4 test.o 
+
+<br><br>
+## Exercise 2
+
+### Implementing broadcasting, gathering and scatter operations with open-mpi for the pcpc course. 
+
+<br>
+
+### Execution 
+
+<br>
+
+###### [!important] You need open-mpi to execute
+
+<br>
+
+#### Steps:
+
+- cd src/ese_1_[broadcast-gathering-scatter]
 - mpicc -c library.c -o library.o
 - mpicc test.c  library.o -o test.o
 - mpirun -np 4 test.o 
