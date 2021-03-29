@@ -1,5 +1,7 @@
 # Open-mpi_pcpc
 
+<br>
+
 ## Exercise 1 
 
 ### Implementing broadcasting, gathering and scatter operations with open-mpi for the pcpc course. 
