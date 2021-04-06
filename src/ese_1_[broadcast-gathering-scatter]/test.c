@@ -23,6 +23,13 @@ int main(int argc, char **argv)
     MPI_Datatype dataType = MPI_INT; // change to MPI_CHAR to send chars
     bool toPrintOut = true;
     MPI_Status Stat;
+    int broadcast_arr_int[N];
+    int gathering_arr_int[N];
+    int scatter_arr_int[N];
+    char broadcast_arr_char[N];
+    char gathering_arr_char[N];
+    char scatter_arr_char[N];
+    int source = 0;
 
     // Initialize the MPI environment
     MPI_Init(NULL, NULL);
@@ -32,20 +39,78 @@ int main(int argc, char **argv)
     // Get the rank of the process
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    
-    MPI_Barrier(MPI_COMM_WORLD); 
+
+    MPI_Barrier(MPI_COMM_WORLD);
     /* tutti i processi sono inizializzati */
     start = MPI_Wtime();
 
-    myBrodcast(world_rank, numbers, dataType, N, world_size, 1, MPI_COMM_WORLD, &Stat, toPrintOut);
-    //myBrodcast(world_rank, chars, dataType, N, world_size, 1, MPI_COMM_WORLD, &Stat,toPrintOut);
+    myBrodcast(world_rank, numbers, dataType, source, N, world_size, 1, MPI_COMM_WORLD, &Stat, broadcast_arr_int, broadcast_arr_char);
+    //myBrodcast(world_rank, chars, dataType, source, N, world_size, 1, MPI_COMM_WORLD, &Stat, broadcast_arr_int, broadcast_arr_char);
 
-    myGathering(world_rank, dataType, test, N, world_size, 11, MPI_COMM_WORLD, &Stat, toPrintOut);
-    //myGathering(world_rank, dataType, charsTest, N, world_size, 11, MPI_COMM_WORLD, &Stat,toPrintOut);
+    if (toPrintOut && world_rank != source)
+    {
+        printf("\n");
+        printf("broadcast -> rank %d", world_rank);
 
-    myScatter(world_rank, numbers, chars, dataType, 0, N, world_size, 111, MPI_COMM_WORLD, &Stat, toPrintOut);
+        if (dataType == MPI_INT)
+            for (int j = 0; j < N; j++)
+            {
+                printf(" %d ", broadcast_arr_int[j]);
+            }
+        else if (dataType == MPI_CHAR)
+            for (int j = 0; j < N; j++)
+            {
+                printf(" %c ", broadcast_arr_char[j]);
+            }
+        printf("\n");
+    }
 
-    MPI_Barrier(MPI_COMM_WORLD); 
+    myGathering(world_rank, dataType, test, charsTest, source, N, world_size, 11, MPI_COMM_WORLD, &Stat, gathering_arr_int, gathering_arr_char);
+
+    if (toPrintOut && world_rank == source)
+    {
+        printf("\n");
+        printf("gathering -> rank %d", world_rank);
+        if (dataType == MPI_INT)
+            for (int j = 0; j < world_size - 1; j++)
+            {
+                printf(" %d ", gathering_arr_int[j]);
+            }
+        else if (dataType == MPI_CHAR)
+            for (int j = 0; j < world_size - 1; j++)
+            {
+                printf(" %c ", gathering_arr_char[j]);
+            }
+        printf("\n");
+    }
+
+    myScatter(world_rank, numbers, chars, dataType, source, N, world_size, 111, MPI_COMM_WORLD, &Stat, scatter_arr_int, scatter_arr_char);
+
+    if (toPrintOut)
+    {
+        // calculate array dimension
+        int dimension = 0;
+        if (world_rank == world_size - 1)
+            dimension = N - ((N / (world_size - 1)) * (world_size - 2));
+        else
+            dimension = N / (world_size - 1);
+            
+        printf("\n");
+        printf("scatter -> rank %d", world_rank);
+        if (dataType == MPI_INT)
+            for (int j = 0; j < dimension; j++)
+            {
+                printf(" %d ", scatter_arr_int[j]);
+            }
+        else
+            for (int j = 0; j < dimension; j++)
+            {
+                printf(" %c ", scatter_arr_char[j]);
+            }
+        printf("\n");
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
     /* tutti i processi hanno terminato */
     end = MPI_Wtime();
 
