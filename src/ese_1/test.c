@@ -44,8 +44,7 @@ int main(int argc, char **argv)
     /* tutti i processi sono inizializzati */
     start = MPI_Wtime();
 
-    myBrodcast(world_rank, numbers, dataType, source, N, world_size, 1, MPI_COMM_WORLD, &Stat, broadcast_arr_int, broadcast_arr_char);
-    //myBrodcast(world_rank, chars, dataType, source, N, world_size, 1, MPI_COMM_WORLD, &Stat, broadcast_arr_int, broadcast_arr_char);
+    myBroadcast(numbers, N, dataType, source, MPI_COMM_WORLD, 1, &Stat, broadcast_arr_int);
 
     if (toPrintOut && world_rank != source)
     {
@@ -65,26 +64,27 @@ int main(int argc, char **argv)
         printf("\n");
     }
 
-    myGathering(world_rank, dataType, test, charsTest, source, N, world_size, 11, MPI_COMM_WORLD, &Stat, gathering_arr_int, gathering_arr_char);
-
+    int sizeRet=0;
+    myGather(numbers, N, dataType, source, MPI_COMM_WORLD, gathering_arr_int, &sizeRet, &Stat);
+   
     if (toPrintOut && world_rank == source)
     {
         printf("\n");
         printf("gathering -> rank %d", world_rank);
         if (dataType == MPI_INT)
-            for (int j = 0; j < world_size - 1; j++)
+            for (int j = 0; j < sizeRet; j++)
             {
                 printf(" %d ", gathering_arr_int[j]);
             }
         else if (dataType == MPI_CHAR)
-            for (int j = 0; j < world_size - 1; j++)
+            for (int j = 0; j < sizeRet; j++)
             {
                 printf(" %c ", gathering_arr_char[j]);
             }
         printf("\n");
     }
 
-    myScatter(world_rank, numbers, chars, dataType, source, N, world_size, 111, MPI_COMM_WORLD, &Stat, scatter_arr_int, scatter_arr_char);
+    //myScatter(world_rank, numbers, chars, dataType, source, N, world_size, 111, MPI_COMM_WORLD, &Stat, scatter_arr_int, scatter_arr_char);
 
     if (toPrintOut)
     {
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
             dimension = N - ((N / (world_size - 1)) * (world_size - 2));
         else
             dimension = N / (world_size - 1);
-            
+
         printf("\n");
         printf("scatter -> rank %d", world_rank);
         if (dataType == MPI_INT)

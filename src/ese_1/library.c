@@ -2,142 +2,223 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-void myBrodcast(int world_rank, const void *array, MPI_Datatype datatype, int source, int N, int world_size, int tag, MPI_Comm MPI_COMMON_WORLD, MPI_Status *Stat, int *int_out, char *chars_out)
+int arrayMin(int arr[], int n)
 {
-    if (world_rank == source)
+    int min = arr[0];
+    for (int i = 0; i < n; i++)
     {
-        for (int i = 1; i < world_size; i++)
-        {
-            if (datatype == MPI_INT)
-                MPI_Send(array, N, MPI_INT, i, tag, MPI_COMM_WORLD);
-
-            else if (datatype == MPI_CHAR)
-                MPI_Send(array, N, MPI_CHAR, i, tag, MPI_COMM_WORLD);
-        }
+        if (arr[i] < min)
+            min = arr[i];
     }
+    return min;
+}
 
-    else if (world_rank != source)
+int arrayMax(int arr[], int n)
+{
+    int max = arr[0];
+    for (int i = 0; i < n; i++)
     {
-        if (datatype == MPI_INT)
-            MPI_Recv(int_out, N, MPI_INT, source, tag, MPI_COMM_WORLD, Stat);
+        if (arr[i] > max)
+            max = arr[i];
+    }
+    return max;
+}
 
-        else if (datatype == MPI_CHAR)
-            MPI_Recv(chars_out, N, MPI_CHAR, source, tag, MPI_COMM_WORLD, Stat);
+int arrayAvg(int arr[], int n)
+{
+    int sum = 0;
+    for (int i = 0; i < n; i++)
+    {
+        sum = sum + arr[i];
+    }
+    return sum / n;
+}
+
+void myBroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Status *Stat, void *out)
+{
+    int rank, numtasks;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+
+    if (rank == source)
+        for (int i = 0; i < numtasks; i++)
+            MPI_Send(buf, bufSize, datatype, i, tag, comm);
+    else
+    {
+        MPI_Recv(out, bufSize, datatype, source, tag, comm, Stat);
     }
 }
 
-void myGathering(int world_rank, MPI_Datatype datatype, int *testInt, char *testChar, int source, int N, int world_size, int tag, MPI_Comm MPI_COMMON_WORLD, MPI_Status *Stat, int *int_out, char *chars_out)
+void myIbroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Request requests[], int *requestSize)
 {
-    if (world_rank == source)
-    {
-        if (datatype == MPI_INT)
+
+    MPI_Status Stat;
+    int rank, numtasks;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+
+    *requestSize = 0;
+
+    if (rank == source)
+        for (int i = 0; i < numtasks; i++)
         {
-            for (int i = 1; i < world_size; i++)
+            MPI_Isend(buf, bufSize, datatype, i, tag, comm, &requests[*requestSize]);
+            *requestSize = *requestSize + 1;
+        }
+    else
+    {
+        MPI_Irecv(buf, bufSize, datatype, source, tag, comm, &requests[0]);
+        *requestSize = 1;
+    }
+}
+
+void myGather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Status *Stat)
+{
+    int rank, numtasks, dataSize;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+    MPI_Type_size(datatype, &dataSize);
+
+    if (rank == root)
+    {
+        int currentSender = 0;
+        for (int i = 0; i < numtasks; i++)
+        {
+            if (i != root)
             {
-                int temp = 0;
-                MPI_Recv(&temp, 1, MPI_INT, i, tag, MPI_COMM_WORLD, Stat);
-                int_out[i - 1] = temp;
+                MPI_Recv(returnBuffer + (currentSender * dataSize), 1, datatype, i, 123, MPI_COMM_WORLD, Stat);
+                currentSender++;
             }
         }
-        else if (datatype == MPI_CHAR)
+        *returnSize = numtasks - 1;
+    }
+    else
+    {
+        MPI_Send((buf + (rank * dataSize)), 1, datatype, root, 123, MPI_COMM_WORLD);
+    }
+}
+
+void myIgather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Request requests[], int *requestsSize)
+{
+
+    MPI_Status status;
+    int rank, numtasks, dataSize;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+
+    MPI_Type_size(datatype, &dataSize);
+
+    *requestsSize = 0;
+
+    if (rank == root)
+    {
+        int currentSender = 0;
+        for (int i = 0; i < numtasks; i++)
         {
-            for (int i = 1; i < world_size; i++)
+            if (i != root)
             {
-                char temp = 0;
-                MPI_Recv(&temp, 1, MPI_CHAR, i, tag, MPI_COMM_WORLD, Stat);
-                chars_out[i - 1] = temp;
+                MPI_Irecv(returnBuffer + (currentSender * dataSize), bufSize, datatype, i, 123, MPI_COMM_WORLD, &requests[*requestsSize]);
+                *requestsSize = *requestsSize + 1;
+                *returnSize = *returnSize + bufSize;
+                currentSender++;
             }
         }
     }
     else
     {
-        if (datatype == MPI_INT)
-        {
-            for (int i = 0; i < world_size - 1; i++)
-            {
-                MPI_Send(&testInt[world_rank], 1, MPI_INT, source, tag, MPI_COMM_WORLD);
-            }
-        }
-        else if (datatype == MPI_CHAR)
-        {
-            MPI_Send(&testChar[world_rank], 1, MPI_CHAR, source, tag, MPI_COMM_WORLD);
-        }
+        MPI_Isend(buf, bufSize, datatype, root, 123, MPI_COMM_WORLD, &requests[0]);
+        *requestsSize = 1;
     }
 }
 
-void myScatter(int world_rank, int arrayInt[], char arrayChar[], MPI_Datatype datatype, int source, int N, int world_size, int tag, MPI_Comm MPI_COMMON_WORLD, MPI_Status *Stat, int *int_out, char *chars_out)
+void myWait(MPI_Request requests[], int size)
 {
-    if (world_rank == source)
+    int index;
+    MPI_Status status;
+    MPI_Waitany(size, requests, &index, &status);
+}
+
+void myScatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize)
+{
+
+    MPI_Status Stat;
+    int rank, numtasks;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+
+    int rest = bufSize % (numtasks - 1);
+    int portion = bufSize / (numtasks - 1);
+
+    int size;
+    MPI_Type_size(datatype, &size);
+
+    if (rank == source)
     {
-        if (world_size < N)
+        int index = 0;
+        int currentRevicer = 0;
+
+        for (int i = 0; i < numtasks; i++)
         {
-            int split_size = N / (world_size - 1);
-
-            int index = 0;
-
-            for (int i = 1; i < world_size - 1; i++)
+            if (i != source)
             {
-                if (datatype == MPI_INT)
-                {
-                    int temp[split_size];
-                    for (int j = 0; j < split_size; j++)
-                    {
-                        temp[j] = arrayInt[index];
-                        index++;
-                    }
-                    MPI_Send(temp, split_size, MPI_INT, i, tag, MPI_COMM_WORLD);
-                }
-                else if (datatype == MPI_CHAR)
-                {
-                    char temp[split_size];
-                    for (int j = 0; j < split_size; j++)
-                    {
-                        temp[j] = arrayChar[index];
-                        index++;
-                    }
-                    MPI_Send(temp, split_size, MPI_CHAR, i, tag, MPI_COMM_WORLD);
-                }
-            }
-
-            split_size = N - index;
-            if (datatype == MPI_INT)
-            {
-                int temp[split_size];
-                for (int i = index; i < N; i++)
-                {
-                    temp[i - index] = arrayInt[i];
-                }
-                MPI_Send(temp, split_size, MPI_INT, world_size - 1, tag, MPI_COMM_WORLD);
-            }
-            else if (datatype == MPI_CHAR)
-            {
-                char temp[split_size];
-                for (int i = index; i < N; i++)
-                {
-                    temp[i - index] = arrayChar[i];
-                }
-                MPI_Send(temp, split_size, MPI_CHAR, world_size - 1, tag, MPI_COMM_WORLD);
+                int toAdd = (rest <= currentRevicer) ? portion : portion + 1;
+                MPI_Send(array + (index * size), toAdd, datatype, i, 123, MPI_COMM_WORLD);
+                index += toAdd;
+                currentRevicer++;
             }
         }
     }
     else
     {
-        // calculate array dimension
-        int dimension = 0;
-        if (world_rank == world_size - 1)
-            dimension = N - ((N / (world_size - 1)) * (world_size - 2));
-        else
-            dimension = N / (world_size - 1);
+        int correntReciver = (rank > source) ? rank - 1 : rank;
+        int toRecive = (rest <= correntReciver) ? portion : portion + 1;
+        *returnSize = toRecive;
+        MPI_Recv(returnBuffer, toRecive, datatype, source, 123, MPI_COMM_WORLD, &Stat);
+    }
+}
 
-        if (datatype == MPI_INT)
+void myIscatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Request requests[], int *requestsSize)
+{
+
+    MPI_Status Stat;
+    int rank, numtasks, dataSize;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+
+    int rest = bufSize % (numtasks - 1);
+    int portion = bufSize / (numtasks - 1);
+
+    MPI_Type_size(datatype, &dataSize);
+
+    if (rank == source)
+    {
+        int index = 0;
+        int currentRevicer = 0;
+
+        for (int i = 0; i < numtasks; i++)
         {
-            // reciving arrays
-            MPI_Recv(&int_out, dimension, MPI_INT, 0, tag, MPI_COMM_WORLD, Stat);
+            if (i != source)
+            {
+                int toAdd = (rest <= currentRevicer) ? portion : portion + 1;
+                MPI_Isend(array + (index * dataSize), toAdd, datatype, i, 123, MPI_COMM_WORLD, &requests[*requestsSize]);
+                *requestsSize = *requestsSize + 1;
+                index += toAdd;
+                currentRevicer++;
+            }
         }
-        else if (datatype == MPI_CHAR)
-        {
-            // reciving array
-            MPI_Recv(&chars_out, dimension, MPI_CHAR, 0, tag, MPI_COMM_WORLD, Stat);
-        }
+    }
+    else
+    {
+        int correntReciver = (rank > source) ? rank - 1 : rank;
+        int toRecive = (rest <= correntReciver) ? portion : portion + 1;
+        *returnSize = toRecive;
+        MPI_Irecv(returnBuffer, toRecive, datatype, source, 123, MPI_COMM_WORLD, &requests[*requestsSize]);
+        *requestsSize = 1;
     }
 }
