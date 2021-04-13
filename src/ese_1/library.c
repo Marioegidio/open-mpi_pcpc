@@ -97,7 +97,7 @@ void myGather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm 
     }
     else
     {
-        MPI_Send((buf + (rank * dataSize)), 1, datatype, root, 123, MPI_COMM_WORLD);
+        MPI_Send(buf + (rank * dataSize), 1, datatype, root, 123, MPI_COMM_WORLD);
     }
 }
 
@@ -142,10 +142,9 @@ void myWait(MPI_Request requests[], int size)
     MPI_Waitany(size, requests, &index, &status);
 }
 
-void myScatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize)
+void myScatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Status *Stat)
 {
 
-    MPI_Status Stat;
     int rank, numtasks;
 
     MPI_Comm_size(comm, &numtasks);
@@ -178,7 +177,7 @@ void myScatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_
         int correntReciver = (rank > source) ? rank - 1 : rank;
         int toRecive = (rest <= correntReciver) ? portion : portion + 1;
         *returnSize = toRecive;
-        MPI_Recv(returnBuffer, toRecive, datatype, source, 123, MPI_COMM_WORLD, &Stat);
+        MPI_Recv(returnBuffer, toRecive, datatype, source, 123, MPI_COMM_WORLD, Stat);
     }
 }
 
