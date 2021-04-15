@@ -12,12 +12,10 @@ int main(int argc, char **argv)
 
     int a[N + 2 * K], blockcounts[1], finalArray[N];
     int portion, rest, recvNum, numtasks, rank, offset = K;
-    typedef struct
-    {
-        int leftK[K];
-        int toSend[N]; // qua non ci va N ma la size della porzione
-        int rightK[K];
-    } PortionToSend;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 
     MPI_Status status;
     MPI_Request request;
@@ -25,10 +23,6 @@ int main(int argc, char **argv)
     // MPI_Aint type used to be consistent with syntax of
     // MPI_Type_extent routine
     MPI_Aint offsets[1], lb, extent;
-
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 
     // setup description of the NOT-PREFIXED MPI_INT fields leftK, rightK & recvArray
     offsets[0] = 0;
@@ -42,6 +36,13 @@ int main(int argc, char **argv)
     portion = N / (numtasks);
     rest = N % numtasks;
     recvNum = (rest <= rank) ? portion : portion + 1;
+
+    typedef struct
+    {
+        int leftK[K];
+        int *toSend; // qua non ci va N ma la size della porzione
+        int rightK[K];
+    } PortionToSend;
 
     int resultArray[recvNum + 2 * K];
 
@@ -66,8 +67,8 @@ int main(int argc, char **argv)
         for (int i = 0; i < numtasks; i++)
         {
             PortionToSend array;
-
             int toSend = (rest <= i) ? portion : portion + 1;
+            array.toSend = malloc(sizeof(toSend * sizeof(int)));
 
             int index = 0;
             for (int j = offset; j < offset + toSend; j++)
@@ -91,11 +92,13 @@ int main(int argc, char **argv)
             offset += toSend;
 
             MPI_Isend(&array, 1, portionType, i, 99, MPI_COMM_WORLD, &request);
+            free(array.toSend);
             // MPI_Isend(message, N * 10, MPI_PACKED, i, 99, MPI_COMM_WORLD, &request);
         }
     }
 
     PortionToSend recivedArray;
+    recivedArray.toSend = malloc(sizeof(recvNum * sizeof(int)));
     MPI_Irecv(&recivedArray, 1, portionType, MASTER, 99, MPI_COMM_WORLD, &request);
 
     for (int i = K; i < recvNum - K; i++)
@@ -137,6 +140,7 @@ int main(int argc, char **argv)
         }
         resultArray[i] = sum / (2 * K + 1);
     }
+    free(recivedArray.toSend);
 
     MPI_Gather(resultArray, recvNum, MPI_INT, finalArray, recvNum, MPI_INT, MASTER, MPI_COMM_WORLD);
 
