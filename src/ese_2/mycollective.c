@@ -6,11 +6,11 @@
 #define MY_min 1
 #define MY_avg 2
 
-
 int arrayMin(int arr[], int n)
 {
     int min = arr[0];
-    for(int i=0; i<n; i++){
+    for (int i = 0; i < n; i++)
+    {
         if (arr[i] < min)
             min = arr[i];
     }
@@ -20,7 +20,8 @@ int arrayMin(int arr[], int n)
 int arrayMax(int arr[], int n)
 {
     int max = arr[0];
-    for(int i=0; i<n; i++){
+    for (int i = 0; i < n; i++)
+    {
         if (arr[i] > max)
             max = arr[i];
     }
@@ -30,369 +31,277 @@ int arrayMax(int arr[], int n)
 int arrayAvg(int arr[], int n)
 {
     int sum = 0;
-    for(int i=0; i<n; i++){
-            sum = sum + arr[i];
+    for (int i = 0; i < n; i++)
+    {
+        sum = sum + arr[i];
     }
-    return sum/n;
+    return sum / n;
 }
 
-
-
-void myBroadcast(const void *buf,int bufSize,MPI_Datatype datatype, int source, MPI_Comm comm, int tag){
+void myIbroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Request requests[], int *requestSize)
+{
 
     MPI_Status Stat;
-
-    int rank,numtasks;
-
+    int rank, numtasks;
 
     MPI_Comm_size(comm, &numtasks);
     MPI_Comm_rank(comm, &rank);
 
+    *requestSize = 0;
 
-    if( rank == source ){
-
-        for(int i = 0; i < numtasks; i++){
-
-
-            if(datatype == MPI_INT){
-
-                MPI_Send(buf, bufSize, MPI_INT, i, tag, comm);
-
-            }else if(datatype == MPI_CHAR){
-
-                MPI_Send(buf, bufSize, MPI_CHAR, i, tag, comm);
-
-            }
-
+    if (rank == source)
+        for (int i = 0; i < numtasks; i++)
+        {
+            MPI_Isend(buf, bufSize, datatype, i, tag, comm, &requests[*requestSize]);
+            *requestSize = *requestSize + 1;
         }
-
-        
-    }else{
-
-        if(datatype == MPI_INT){
-
-            int recivedArray[bufSize];
-
-            MPI_Recv(recivedArray, bufSize, MPI_INT, source, tag, comm, &Stat);
-
-            for(int i=0; i < bufSize; i++){
-
-            printf("Task %d, element %d: %d\n", rank,i,recivedArray[i]);
-            fflush(stdout);
-
-            }
-
-        }else if(datatype == MPI_CHAR){
-
-            char recivedArray[bufSize];
-
-            MPI_Recv(recivedArray, bufSize, MPI_CHAR, source, tag, comm, &Stat);
-
-            for(int i=0; i < bufSize; i++){
-
-            printf("Task %d, element %d: %c\n", rank,i,recivedArray[i]);
-            fflush(stdout);
-
-            }
-
-        }
-        
+    else
+    {
+        MPI_Irecv(buf, bufSize, datatype, source, tag, comm, &requests[0]);
+        *requestSize = 1;
     }
-
 }
 
+void myIgather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Request requests[], int *requestsSize)
+{
 
-
-
-
-void myGatheting(MPI_Datatype datatype, int dest, MPI_Comm comm, int tag){
-
-    MPI_Status Stat;
-
-    int rank,numtasks;
+    MPI_Status status;
+    int rank, numtasks, dataSize;
 
     MPI_Comm_size(comm, &numtasks);
     MPI_Comm_rank(comm, &rank);
 
-    int array[numtasks];
+    MPI_Type_size(datatype, &dataSize);
 
+    *requestsSize = 0;
 
-    if( rank == dest ){
-
-        for(int i = 1; i < numtasks; i++){
-
-            int res;
-
-            MPI_Recv(&res, 1, MPI_INT, i, 123, MPI_COMM_WORLD,&Stat);
-            array[i] = res;
-
+    if (rank == root)
+    {
+        int currentSender = 0;
+        for (int i = 0; i < numtasks; i++)
+        {
+            if (i != root)
+            {
+                MPI_Irecv(returnBuffer + (currentSender * dataSize), bufSize, datatype, i, 123, MPI_COMM_WORLD, &requests[*requestsSize]);
+                *requestsSize = *requestsSize + 1;
+                *returnSize = *returnSize + bufSize;
+                currentSender++;
+            }
         }
-
-        
-    }else{
-
-        srand(rank);
-
-        int val = rand() % 100;
-
-        MPI_Send(&val, 1, MPI_INT, dest, 123, MPI_COMM_WORLD);
-
-        
- 
     }
-
+    else
+    {
+        MPI_Isend(buf, bufSize, datatype, root, 123, MPI_COMM_WORLD, &requests[0]);
+        *requestsSize = 1;
+    }
 }
 
-
-void myScaatter(int array[],int bufSize, int source, MPI_Comm comm, int returnBuffer[], int *returnSize){
+void myIscatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Request requests[], int *requestsSize)
+{
 
     MPI_Status Stat;
-
-    int rank,numtasks;
+    int rank, numtasks, dataSize;
 
     MPI_Comm_size(comm, &numtasks);
     MPI_Comm_rank(comm, &rank);
 
+    int rest = bufSize % (numtasks - 1);
+    int portion = bufSize / (numtasks - 1);
 
+    MPI_Type_size(datatype, &dataSize);
 
+    if (rank == source)
+    {
+        int index = 0;
+        int currentRevicer = 0;
 
-    if( rank == source ){
-
-        int rest = bufSize%(numtasks-1);
-        int added, index = 0;
-        int portion=bufSize/(numtasks-1);
-
-        for(int i = 0; i < numtasks; i++){
-
-            if(i != source){
-
-                int toAdd;
-
-                if(rest != 0){
-                    toAdd = portion + 1;
-                    rest--;
-                } else 
-                    toAdd = portion;
-
-                int arrayPortion[toAdd];
-
-                for(int j = 0; j < toAdd; j++){
-                    arrayPortion[j] = array[index];
-                    index++;
-                }
-
-                MPI_Send(&toAdd, 1, MPI_INT, i, 99, MPI_COMM_WORLD);
-
-                MPI_Send(arrayPortion, toAdd, MPI_INT, i, 123, MPI_COMM_WORLD);
-
+        for (int i = 0; i < numtasks; i++)
+        {
+            if (i != source)
+            {
+                int toAdd = (rest <= currentRevicer) ? portion : portion + 1;
+                MPI_Isend(array + (index * dataSize), toAdd, datatype, i, 123, MPI_COMM_WORLD, &requests[*requestsSize]);
+                *requestsSize = *requestsSize + 1;
+                index += toAdd;
+                currentRevicer++;
             }
-
         }
-
-        
-
-    }else if( rank != 0){
-
-        int size;
-
-        MPI_Recv(&size, 1, MPI_INT, source, 99, MPI_COMM_WORLD, &Stat);
-
-
-        *returnSize = size;
-        int recivedArray[size];
-
-        MPI_Recv(recivedArray, size, MPI_INT, source, 123, MPI_COMM_WORLD, &Stat);
-
-        for(int i = 0; i<size;i++){
-            returnBuffer[i] = recivedArray[i];
-        }
-
     }
-
+    else
+    {
+        int correntReciver = (rank > source) ? rank - 1 : rank;
+        int toRecive = (rest <= correntReciver) ? portion : portion + 1;
+        *returnSize = toRecive;
+        MPI_Irecv(returnBuffer, toRecive, datatype, source, 123, MPI_COMM_WORLD, &requests[*requestsSize]);
+        *requestsSize = 1;
+    }
 }
 
+void myWait(MPI_Request requests[], int size)
+{
+    int index;
+    MPI_Status status;
+    MPI_Waitany(size, requests, &index, &status);
+}
 
+void myBroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Status *Stat, void *out)
+{
+    int rank, numtasks;
 
-void myReduce(int array[],int bufSize, int dest, MPI_Comm comm, int mode, int *result){
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+
+    if (rank == source)
+        for (int i = 0; i < numtasks; i++)
+            MPI_Send(buf, bufSize, datatype, i, tag, comm);
+    else
+    {
+        MPI_Recv(out, bufSize, datatype, source, tag, comm, Stat);
+    }
+}
+
+void myGather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Status *Stat)
+{
+    int rank, numtasks, dataSize;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+    MPI_Type_size(datatype, &dataSize);
+
+    if (rank == root)
+    {
+        int currentSender = 0;
+        for (int i = 0; i < numtasks; i++)
+        {
+            if (i != root)
+            {
+                MPI_Recv(returnBuffer + (currentSender * dataSize), 1, datatype, i, 123, MPI_COMM_WORLD, Stat);
+                currentSender++;
+            }
+        }
+        *returnSize = numtasks - 1;
+    }
+    else
+    {
+        MPI_Send(buf + (rank * dataSize), 1, datatype, root, 123, MPI_COMM_WORLD);
+    }
+}
+
+void myScatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Status *Stat)
+{
+
+    int rank, numtasks;
+
+    MPI_Comm_size(comm, &numtasks);
+    MPI_Comm_rank(comm, &rank);
+
+    int rest = bufSize % (numtasks - 1);
+    int portion = bufSize / (numtasks - 1);
+
+    int size;
+    MPI_Type_size(datatype, &size);
+
+    if (rank == source)
+    {
+        int index = 0;
+        int currentRevicer = 0;
+
+        for (int i = 0; i < numtasks; i++)
+        {
+            if (i != source)
+            {
+                int toAdd = (rest <= currentRevicer) ? portion : portion + 1;
+                MPI_Send(array + (index * size), toAdd, datatype, i, 123, MPI_COMM_WORLD);
+                index += toAdd;
+                currentRevicer++;
+            }
+        }
+    }
+    else
+    {
+        int correntReciver = (rank > source) ? rank - 1 : rank;
+        int toRecive = (rest <= correntReciver) ? portion : portion + 1;
+        *returnSize = toRecive;
+        MPI_Recv(returnBuffer, toRecive, datatype, source, 123, MPI_COMM_WORLD, Stat);
+    }
+}
+
+void myReduce(int array[], int bufSize, int dest, MPI_Datatype datatype, MPI_Comm comm, int mode, int *result)
+{
 
     MPI_Status status;
 
-    int rank,numtasks;
+    int rank, numtasks;
 
     MPI_Comm_size(comm, &numtasks);
     MPI_Comm_rank(comm, &rank);
 
-    int arrayRes[bufSize];
-    int size;
+    int returnBuffer[bufSize];
+    int returnSize;
+    int source = 0;
 
+    myScatter(array, bufSize, datatype, source, comm, returnBuffer, &returnSize, &status);
 
-    myScaatter(array,bufSize,dest,MPI_COMM_WORLD,arrayRes, &size);
-
-     if(rank != dest){
+    if (rank != dest)
+    {
 
         int res;
 
-        switch(mode){
-            case MY_min: res = arrayMin(arrayRes,size); break;
-            case MY_max: res = arrayMax(arrayRes,size); break;
-            case MY_avg: res = arrayAvg(arrayRes,size); break;
-            default: res = arrayMin(arrayRes,size); break;
+        switch (mode)
+        {
+        case MY_min:
+            res = arrayMin(returnBuffer, returnSize);
+            break;
+        case MY_max:
+            res = arrayMax(returnBuffer, returnSize);
+            break;
+        case MY_avg:
+            res = arrayAvg(returnBuffer, returnSize);
+            break;
+        default:
+            res = arrayMin(returnBuffer, returnSize);
+            break;
         }
 
-        MPI_Send(&res,1,MPI_INT,dest,12345,MPI_COMM_WORLD);
-    }else{
-        int arrayResult[numtasks-1];
-        int index = 0; 
+        MPI_Send(&res, 1, MPI_INT, dest, 12345, MPI_COMM_WORLD);
+    }
+    else
+    {
+        int returnBuffer[numtasks - 1];
+        int index = 0;
 
-        for(int i = 0; i<numtasks;i++){
+        for (int i = 0; i < numtasks; i++)
+        {
 
-            if(i != dest){
+            if (i != dest)
+            {
 
                 int res;
 
-                MPI_Recv(&res,1,MPI_INT,i,12345,MPI_COMM_WORLD,&status);
+                MPI_Recv(&res, 1, MPI_INT, i, 12345, MPI_COMM_WORLD, &status);
 
-                arrayResult[index] = res;
+                returnBuffer[index] = res;
 
                 index++;
             }
-
         }
 
         int res;
-        switch(mode){
-            case MY_min: res = arrayMin(arrayResult,numtasks-1); break;
-            case MY_max: res = arrayMax(arrayResult,numtasks-1); break;
-            case MY_avg: res = arrayAvg(arrayResult,numtasks-1); break;
-            default: res = arrayMin(arrayResult,numtasks-1); break;
+        switch (mode)
+        {
+        case MY_min:
+            res = arrayMin(returnBuffer, numtasks - 1);
+            break;
+        case MY_max:
+            res = arrayMax(returnBuffer, numtasks - 1);
+            break;
+        case MY_avg:
+            res = arrayAvg(returnBuffer, numtasks - 1);
+            break;
+        default:
+            res = arrayMin(returnBuffer, numtasks - 1);
+            break;
         }
         *result = res;
     }
-
-   
-
-}
-
-
-void myIbroadcast(int buf[],int bufSize,MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Request *request, int retBuffer[]){
-
-    int rank,numtasks;
-
-    MPI_Comm_size(comm, &numtasks);
-    MPI_Comm_rank(comm, &rank);
-
-    if( rank == source ){
-
-        for(int i = 0; i < numtasks; i++){
-
-            if(i != source){
-
-                MPI_Isend(buf, bufSize, MPI_INT, i, tag, comm,request);
-
-            }
-
-        }
-
-        
-    }else{
-
-        int recivedArray[bufSize];
-
-        MPI_Irecv(recivedArray, bufSize, MPI_INT, source, tag, comm, request);
-
-        retBuffer = recivedArray;
-
-        for(int i=0; i<bufSize; i++){
-
-            retBuffer[i] = recivedArray[i];
-
-        }
-
-
-        
-    }
-
-}
-
-
-
-
-void myWait(MPI_Request requests[],int size){
-    int index;
-    MPI_Status status;
-    MPI_Waitany(size,requests,&index, &status);
-}
-
-
-
-
-
-
-void myIscaatter(int array[],int bufSize, int source, MPI_Comm comm, int returnBuffer[], int *returnSize, MPI_Request requests[], int *requestSize){
-
-    MPI_Status Stat;
-
-    int rank,numtasks;
-
-    MPI_Comm_size(comm, &numtasks);
-    MPI_Comm_rank(comm, &rank);
-
-    //MPI_Request request;
-
-    int reqSize = 0;
-
-
-    if( rank == source ){
-
-        int rest = bufSize%(numtasks-1);
-        int added, index = 0;
-        int portion=bufSize/(numtasks-1);
-        *returnSize = 0;
-
-        for(int i = 0; i < numtasks; i++){
-
-            if(i != source){
-
-                int toAdd;
-
-                if(rest != 0){
-                    toAdd = portion + 1;
-                    rest--;
-                } else 
-                    toAdd = portion;
-
-                int arrayPortion[toAdd];
-
-                for(int j = 0; j < toAdd; j++){
-                    arrayPortion[j] = array[index];
-                    index++;
-                }
-
-                MPI_Send(&toAdd, 1, MPI_INT, i, 99, comm);
-
-                MPI_Isend(arrayPortion, toAdd, MPI_INT, i, 123, comm,&requests[reqSize]);
-                reqSize++;
-
-
-            }
-
-        }
-
-        *requestSize = reqSize;
-
-        
-    }else if( rank != 0){
-
-        int size;
-
-        MPI_Recv(&size, 1, MPI_INT, source, 99, comm, &Stat);
-
-
-        *returnSize = size;
-
-        MPI_Irecv(returnBuffer, size, MPI_INT, source, 123, comm, &requests[reqSize]);
-        reqSize++;
-        *requestSize = reqSize;
-    }
-
 }
