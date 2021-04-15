@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     typedef struct
     {
         int leftK[K];
-        int portion[N]; // qua non ci va la size della porzione
+        int portion[N]; // qua non ci va la size della porzione ma *portion
         int rightK[K];
     } PortionToSend;
 
