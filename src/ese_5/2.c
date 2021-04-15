@@ -56,17 +56,17 @@ int main(int argc, char **argv){
             }
             index =0;
             for(int j=offset-K; j<offset;j++){
-                if(j>=0 && j<=N)
-                    leftK[index] = a[j];
+                leftK[index] = a[j];
                 index++;
             }
             index =0;
             for(int j=offset+toSend; j<offset+toSend+K;j++){
-                if(j>=0 && j<=N)
-                    rightK[index] = a[j];
+                rightK[index] = a[j];
                 index++;
 
             }
+
+            offset += toSend;
         
 
             position = 0;
