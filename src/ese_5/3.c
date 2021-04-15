@@ -40,12 +40,12 @@ int main(int argc, char **argv)
     typedef struct
     {
         int leftK[K];
-        int *portion; // qua non ci va la size della porzione
+        int portion[N]; // qua non ci va la size della porzione
         int rightK[K];
     } PortionToSend;
 
     PortionToSend recivedData;
-    recivedData.portion = malloc(sizeof(recvNum * sizeof(int)));
+    //recivedData.portion = malloc(sizeof(recvNum * sizeof(int)));
 
     int resultArray[recvNum + 2 * K];
 
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 
             int toSend = (rest <= i) ? portion : portion + 1;
             PortionToSend dataToSend;
-            dataToSend.portion = malloc(sizeof(toSend * sizeof(int)));
+            //dataToSend.portion = malloc(sizeof(toSend * sizeof(int)));
 
             int index = 0;
             for (int j = offset; j < offset + toSend; j++)
@@ -95,12 +95,12 @@ int main(int argc, char **argv)
             offset += toSend;
 
             MPI_Isend(&dataToSend, 1, portionType, i, 99, MPI_COMM_WORLD, &request);
-            free(dataToSend.portion);
+            //free(dataToSend.portion);
             //MPI_Isend(message, N * 10, MPI_PACKED, i, 99, MPI_COMM_WORLD, &request);
         }
     }
 
-    recivedData.portion = malloc(sizeof(recvNum * sizeof(int)));
+    //recivedData.portion = malloc(sizeof(recvNum * sizeof(int)));
     MPI_Recv(&recivedData, 1, portionType, MASTER, 99, MPI_COMM_WORLD, &status);
 
     for (int i = K; i < recvNum - K; i++)
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
         resultArray[i] = sum / (2 * K + 1);
     }
 
-    free(recivedData.portion);
+    //free(recivedData.portion);
     MPI_Gather(resultArray, recvNum, MPI_INT, finalArray, recvNum, MPI_INT, MASTER, MPI_COMM_WORLD);
 
     if (rank == MASTER)
