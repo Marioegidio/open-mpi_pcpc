@@ -1,5 +1,6 @@
 #include <mpi.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #define MY_max 0
@@ -38,12 +39,12 @@ int arrayAvg(int arr[], int n)
     return sum / n;
 }
 
-void myIbroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Request requests[], int *requestSize)
+void myIbroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Request requests[], int *requestSize, void *out)
 {
 
     MPI_Status Stat;
-    int rank, numtasks;
 
+    int rank, numtasks;
     MPI_Comm_size(comm, &numtasks);
     MPI_Comm_rank(comm, &rank);
 
@@ -52,12 +53,15 @@ void myIbroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI
     if (rank == source)
         for (int i = 0; i < numtasks; i++)
         {
-            MPI_Isend(buf, bufSize, datatype, i, tag, comm, &requests[*requestSize]);
-            *requestSize = *requestSize + 1;
+            if (i != source)
+            {
+                MPI_Isend(buf, bufSize, datatype, i, tag, comm, &requests[*requestSize]);
+                *requestSize = *requestSize + 1;
+            }
         }
     else
     {
-        MPI_Irecv(buf, bufSize, datatype, source, tag, comm, &requests[0]);
+        MPI_Irecv(out, bufSize, datatype, source, tag, comm, &requests[0]);
         *requestSize = 1;
     }
 }
@@ -70,7 +74,6 @@ void myIgather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm
 
     MPI_Comm_size(comm, &numtasks);
     MPI_Comm_rank(comm, &rank);
-
     MPI_Type_size(datatype, &dataSize);
 
     *requestsSize = 0;
@@ -82,16 +85,16 @@ void myIgather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm
         {
             if (i != root)
             {
-                MPI_Irecv(returnBuffer + (currentSender * dataSize), bufSize, datatype, i, 123, MPI_COMM_WORLD, &requests[*requestsSize]);
+                MPI_Irecv(returnBuffer + (currentSender * dataSize), 1, datatype, i, 123, comm, &requests[*requestsSize]);
                 *requestsSize = *requestsSize + 1;
-                *returnSize = *returnSize + bufSize;
                 currentSender++;
             }
+            *returnSize = numtasks - 1;
         }
     }
     else
     {
-        MPI_Isend(buf, bufSize, datatype, root, 123, MPI_COMM_WORLD, &requests[0]);
+        MPI_Isend(buf + (rank * dataSize), 1, datatype, root, 123, comm, &requests[0]);
         *requestsSize = 1;
     }
 }
@@ -109,7 +112,8 @@ void myIscatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI
     int portion = bufSize / (numtasks - 1);
 
     MPI_Type_size(datatype, &dataSize);
-
+    *requestsSize = 0;
+    
     if (rank == source)
     {
         int index = 0;
@@ -139,7 +143,7 @@ void myIscatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI
 
 void myWait(MPI_Request requests[], int size)
 {
-    int index;
+    int index = 0;
     MPI_Status status;
     MPI_Waitany(size, requests, &index, &status);
 }

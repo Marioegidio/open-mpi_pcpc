@@ -2,17 +2,6 @@
 #include <string.h>
 #define N 11
 
-void printOut(char message[], int world_rank, int rank_aspected, int world_size)
-{
-    // check to print only one time
-    if ((rank_aspected == 0 && world_rank == 0) || (rank_aspected == 1 && world_rank == (world_size - 1)))
-    {
-        printf("\n");
-        printf("%s", message);
-        printf("\n");
-    }
-}
-
 int main(int argc, char **argv)
 {
     int numbers[N] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};

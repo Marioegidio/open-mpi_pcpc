@@ -1,5 +1,6 @@
 #include <mpi.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #define MY_max 0
@@ -11,7 +12,7 @@ int arrayMax(int arr[], int n);
 int arrayAvg(int arr[], int n);
 
 void myReduce(int array[], int bufSize, int dest, MPI_Datatype datatype, MPI_Comm comm, int mode, int *result);
-void myIbroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Request requests[], int *requestSize);
+void myIbroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Request requests[], int *requestSize, void *out);
 void myIgather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Request requests[], int *requestsSize);
 void myIscatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Request requests[], int *requestsSize);
 void myWait(MPI_Request requests[], int size);

@@ -2,38 +2,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-int arrayMin(int arr[], int n)
-{
-    int min = arr[0];
-    for (int i = 0; i < n; i++)
-    {
-        if (arr[i] < min)
-            min = arr[i];
-    }
-    return min;
-}
-
-int arrayMax(int arr[], int n)
-{
-    int max = arr[0];
-    for (int i = 0; i < n; i++)
-    {
-        if (arr[i] > max)
-            max = arr[i];
-    }
-    return max;
-}
-
-int arrayAvg(int arr[], int n)
-{
-    int sum = 0;
-    for (int i = 0; i < n; i++)
-    {
-        sum = sum + arr[i];
-    }
-    return sum / n;
-}
-
 void myBroadcast(void *buf, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, int tag, MPI_Status *Stat, void *out)
 {
     int rank, numtasks;
@@ -75,13 +43,6 @@ void myGather(void *buf, int bufSize, MPI_Datatype datatype, int root, MPI_Comm 
     {
         MPI_Send(buf + (rank * dataSize), 1, datatype, root, 123, MPI_COMM_WORLD);
     }
-}
-
-void myWait(MPI_Request requests[], int size)
-{
-    int index;
-    MPI_Status status;
-    MPI_Waitany(size, requests, &index, &status);
 }
 
 void myScatter(void *array, int bufSize, MPI_Datatype datatype, int source, MPI_Comm comm, void *returnBuffer, int *returnSize, MPI_Status *Stat)
